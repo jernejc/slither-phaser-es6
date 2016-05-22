@@ -9,31 +9,34 @@ export default class extends Phaser.State {
     this.snakeSection = new Array();
     this.snakePath = new Array();
     this.numSnakeSections = 30;
-    this.snakeSpacer = 2;
+    this.snakeSpacer = 1;
     this.foodGroup;
   }
 
   preload () {
-    this.game.load.image('ball','assets/images/aqua_ball.png');
-    this.game.load.image('red','assets/images/food/orb-red.png');
-    this.game.load.image('blue','assets/images/food/orb-blue.png');
-    this.game.load.image('green','assets/images/food/orb-green.png');
+    this.game.load.image('body','assets/images/body1.png');
+    this.game.load.image('head','assets/images/head1.png');
+    this.game.load.image('pink','assets/images/food/glowy-pink.png');
+    this.game.load.image('blue','assets/images/food/glowy-blue.png');
+    this.game.load.image('green','assets/images/food/glowy-green.png');
+    this.game.load.image('lime','assets/images/food/glowy-lime.png');
+    this.game.load.image('red','assets/images/food/glowy-red.png');
   }
 
   create () {
     this.game.physics.startSystem(Phaser.Physics.ARCADE);
-    this.game.world.setBounds(0, 0, 3600, 3600);
+    this.game.world.setBounds(0, 0, 4600, 4600);
 
     this.cursors = this.game.input.keyboard.createCursorKeys();
 
     // Snake and its head
-    this.snakeHead = this.game.add.sprite(400, 300, 'ball');
+    this.snakeHead = this.game.add.sprite(400, 300, 'head');
     this.snakeHead.anchor.setTo(0.5, 0.5);
 
     this.game.physics.enable(this.snakeHead, Phaser.Physics.ARCADE);
     
     for (let i = 1; i <= this.numSnakeSections - 1; i++) {
-      this.snakeSection[i] = this.game.add.sprite(400, 300, 'ball');
+      this.snakeSection[i] = this.game.add.sprite(400, 300, 'body');
       this.snakeSection[i].anchor.setTo(0.5, 0.5);
     }
     
@@ -41,19 +44,28 @@ export default class extends Phaser.State {
       this.snakePath[i] = new Phaser.Point(400, 300);
     }
 
+    this.snakeHead.body.collideWorldBounds = true;
     this.game.camera.follow(this.snakeHead);
 
     // Add foodGroup and generate a few randoms ones
     this.foodGroup = this.game.add.physicsGroup();
 
-    for (let i = 0; i < 30; i++) {
+    for (let i = 0; i < 100; i++) {
+      this.foodGroup.create(this.game.world.randomX, this.game.world.randomY, 'pink');
+    }
+
+    for (let i = 0; i < 40; i++) {
       this.foodGroup.create(this.game.world.randomX, this.game.world.randomY, 'blue');
-      this.foodGroup.create(this.game.world.randomX, this.game.world.randomY, 'red');
       this.foodGroup.create(this.game.world.randomX, this.game.world.randomY, 'green');
     }
 
-    console.log('this.snakePath', this.snakePath);
-    console.log('this.snakeSection', this.snakeSection);
+    for (let i = 0; i < 10; i++) {
+      this.foodGroup.create(this.game.world.randomX, this.game.world.randomY, 'red');
+    }
+
+    for (let i = 0; i < 20; i++) {
+      this.foodGroup.create(this.game.world.randomX, this.game.world.randomY, 'lime');
+    }
 
     // set the sprite width to 30% of the game width
     //setResponsiveWidth(this.snakeHead, 30, this.game.world)
@@ -98,21 +110,34 @@ export default class extends Phaser.State {
   ********************/
 
   _handleColision (head, food) {
-    //console.log('_handleColision', arguments);
+    console.log('_handleColision', arguments);
 
     switch(food.key) {
       case 'green':
         this._growSnake(1)
       break;
       case 'red':
-        this._growSnake(2)
+        this._growSnake(20)
       break;
       case 'blue':
         this._growSnake(3)
       break;
+      case 'lime':
+        this._growSnake(10)
+      break;
+      case 'pink':
+        this._growSnake(2)
+      break;
     }
 
-    food.kill();
+    let eat = this.game.add.tween(food);
+
+    eat.to({ x: head.x , y: head.y }, 50);
+    eat.onComplete.add(function function_name(argument) {
+      console.log('eat callback')
+      food.kill();
+    }, this);
+    eat.start();
   }
 
   _processHandler (head, food) { 
@@ -127,7 +152,7 @@ export default class extends Phaser.State {
     let lastPoint = this.snakePath[this.snakePath.length];
 
     for (let i = 0; i <= length; i++) {
-      this.snakeSection[this.numSnakeSections] = this.game.add.sprite(this.snakeSection[this.numSnakeSections - 1].x + this.snakeSpacer, this.snakeSection[this.numSnakeSections - 1].y + this.snakeSpacer, 'ball');
+      this.snakeSection[this.numSnakeSections] = this.game.add.sprite(this.snakeSection[this.numSnakeSections - 1].x + this.snakeSpacer, this.snakeSection[this.numSnakeSections - 1].y + this.snakeSpacer, 'body');
       this.snakeSection[this.numSnakeSections].anchor.setTo(0.5, 0.5)
       this.numSnakeSections++;
 
@@ -135,5 +160,9 @@ export default class extends Phaser.State {
         this.snakePath[i] = new Phaser.Point(this.snakePath[i - 1].x, this.snakePath[i - 1].y);
       }
     }
+  }
+
+  _killFood(food) {
+    food.kill()
   }
 }

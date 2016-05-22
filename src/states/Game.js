@@ -130,14 +130,7 @@ export default class extends Phaser.State {
       break;
     }
 
-    let eat = this.game.add.tween(food);
-
-    eat.to({ x: head.x , y: head.y }, 50);
-    eat.onComplete.add(function function_name(argument) {
-      console.log('eat callback')
-      food.kill();
-    }, this);
-    eat.start();
+    food.kill();
   }
 
   _processHandler (head, food) { 
@@ -160,9 +153,5 @@ export default class extends Phaser.State {
         this.snakePath[i] = new Phaser.Point(this.snakePath[i - 1].x, this.snakePath[i - 1].y);
       }
     }
-  }
-
-  _killFood(food) {
-    food.kill()
   }
 }

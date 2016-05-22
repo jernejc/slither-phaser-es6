@@ -13,7 +13,13 @@ export default class extends Phaser.State {
     //
     // load your assets
     //
-    this.load.image('ball', 'assets/images/aqua_ball.png')
+    this.load.image('body','assets/images/body1.png');
+    this.load.image('head','assets/images/head1.png');
+    this.load.image('pink','assets/images/food/glowy-pink.png');
+    this.load.image('blue','assets/images/food/glowy-blue.png');
+    this.load.image('green','assets/images/food/glowy-green.png');
+    this.load.image('lime','assets/images/food/glowy-lime.png');
+    this.load.image('red','assets/images/food/glowy-red.png');
   }
 
   create () {

@@ -1,15 +1,13 @@
 
 import Phaser from 'phaser'
 import Food from '../sprites/Food'
+import Player from '../objects/Player'
 import {setResponsiveWidth} from '../utils'
+import io from 'socket.io-client'
+let socket = io(`http://localhost:3000`)
 
 export default class extends Phaser.State {
   init () {
-    this.snakeHead;
-    this.snakeSection = new Array();
-    this.snakePath = new Array();
-    this.numSnakeSections = 30;
-    this.snakeSpacer = 1;
     this.foodGroup;
   }
 
@@ -27,25 +25,18 @@ export default class extends Phaser.State {
     this.game.physics.startSystem(Phaser.Physics.ARCADE);
     this.game.world.setBounds(0, 0, 4600, 4600);
 
-    this.cursors = this.game.input.keyboard.createCursorKeys();
+    this.enemies = [];
+    this.player = new Player({
+      game: this.game,
+      x: this.game.world.centerX,
+      y: this.game.world.centerY,
+      assets: {
+        head: 'head',
+        body: 'body'
+      }
+    })
 
-    // Snake and its head
-    this.snakeHead = this.game.add.sprite(400, 300, 'head');
-    this.snakeHead.anchor.setTo(0.5, 0.5);
-
-    this.game.physics.enable(this.snakeHead, Phaser.Physics.ARCADE);
-    
-    for (let i = 1; i <= this.numSnakeSections - 1; i++) {
-      this.snakeSection[i] = this.game.add.sprite(400, 300, 'body');
-      this.snakeSection[i].anchor.setTo(0.5, 0.5);
-    }
-    
-    for (let i = 0; i <= this.numSnakeSections * this.snakeSpacer; i++) {
-      this.snakePath[i] = new Phaser.Point(400, 300);
-    }
-
-    this.snakeHead.body.collideWorldBounds = true;
-    this.game.camera.follow(this.snakeHead);
+    this.game.camera.follow(this.player.snakeHead);
 
     // Add foodGroup and generate a few randoms ones
     this.foodGroup = this.game.add.physicsGroup();
@@ -69,39 +60,36 @@ export default class extends Phaser.State {
 
     // set the sprite width to 30% of the game width
     //setResponsiveWidth(this.snakeHead, 30, this.game.world)
-    //this.game.add.existing(this.snakeHead)
+    //this.game.add.existing(this.player.snakeHead)
+
+    // Socket connection successful
+    socket.on('connect', this._onSocketConnected)
+
+    // Socket disconnection
+    //socket.on('disconnect', onSocketDisconnect)
+
+    // New player message received
+    //socket.on('new player', onNewPlayer)
+
+    // Player move message received
+    //socket.on('move player', onMovePlayer)
+
+    // Player removed message received
+    //socket.on('remove player', onRemovePlayer)
   }
 
   update () {
-    this.snakeHead.body.velocity.setTo(0, 0);
-    this.snakeHead.body.angularVelocity = 0;
-
-    if (this.game.physics.arcade.collide(this.snakeHead, this.foodGroup, this._handleColision, this._processHandler, this)) {
+    if (this.game.physics.arcade.collide(this.player.snakeHead, this.foodGroup, this._handleColision, this._processHandler, this)) {
       console.log('nom nom nom');
     }
 
-    if (this.cursors.up.isDown) {
-      this.snakeHead.body.velocity.copyFrom(this.game.physics.arcade.velocityFromAngle(this.snakeHead.angle, 300));
-
-      let part = this.snakePath.pop();
-      part.setTo(this.snakeHead.x, this.snakeHead.y);
-      this.snakePath.unshift(part);
-
-      for (let i = 1; i <= this.numSnakeSections - 1; i++) {
-        this.snakeSection[i].x = (this.snakePath[i * this.snakeSpacer]).x;
-        this.snakeSection[i].y = (this.snakePath[i * this.snakeSpacer]).y;
-      }
-    }
-
-    if (this.cursors.left.isDown)
-      this.snakeHead.body.angularVelocity = -300;
-    else if (this.cursors.right.isDown)
-      this.snakeHead.body.angularVelocity = 300;
+    // Update player
+    this.player.update();
   }
 
   render () {
     if (__DEV__) {
-      this.game.debug.spriteInfo(this.snakeHead, 32, 32)
+      this.game.debug.spriteInfo(this.player.snakeHead, 32, 32)
     }
   }
 
@@ -110,23 +98,23 @@ export default class extends Phaser.State {
   ********************/
 
   _handleColision (head, food) {
-    console.log('_handleColision', arguments);
+    //console.log('_handleColision', arguments);
 
     switch(food.key) {
       case 'green':
-        this._growSnake(1)
+        this.player.grow(1)
       break;
       case 'red':
-        this._growSnake(20)
+        this.player.grow(20)
       break;
       case 'blue':
-        this._growSnake(3)
+        this.player.grow(3)
       break;
       case 'lime':
-        this._growSnake(10)
+        this.player.grow(10)
       break;
       case 'pink':
-        this._growSnake(2)
+        this.player.grow(2)
       break;
     }
 
@@ -139,19 +127,20 @@ export default class extends Phaser.State {
     return true;
   }
 
-  _growSnake (length) {
-    //console.log('_growSnake', arguments);
+  /*******************
+  ** Event handlers **
+  *******************/
 
-    let lastPoint = this.snakePath[this.snakePath.length];
+  _onSocketConnected () {
+    console.log('Connected to socket server')
 
-    for (let i = 0; i <= length; i++) {
-      this.snakeSection[this.numSnakeSections] = this.game.add.sprite(this.snakeSection[this.numSnakeSections - 1].x + this.snakeSpacer, this.snakeSection[this.numSnakeSections - 1].y + this.snakeSpacer, 'body');
-      this.snakeSection[this.numSnakeSections].anchor.setTo(0.5, 0.5)
-      this.numSnakeSections++;
+    // Reset enemies on reconnect
+    this.enemies.forEach(function (enemy) {
+      enemy.player.kill()
+    })
+    this.enemies = []
 
-      for (let i = this.snakePath.length; i <= this.numSnakeSections * this.snakeSpacer; i++) {
-        this.snakePath[i] = new Phaser.Point(this.snakePath[i - 1].x, this.snakePath[i - 1].y);
-      }
-    }
+    // Send local player data to the game server
+    socket.emit('new player', { x: this.player.snakeHead.x, y: this.player.snakeHead.y })
   }
 }

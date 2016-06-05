@@ -1,9 +1,11 @@
 /* ************************************************
 ** GAME PLAYER CLASS
 ************************************************ */
-var Player = function (startX, startY) {
+var Player = function (startX, startY, startSections, startAngle) {
   var x = startX
   var y = startY
+  var numSnakeSections = startSections
+  var angel = startAngle
   var id
 
   // Getters and setters
@@ -15,6 +17,14 @@ var Player = function (startX, startY) {
     return y
   }
 
+  var getSections = function () {
+    return numSnakeSections
+  }
+
+  var getAngle = function () {
+    return angel
+  }
+
   var setX = function (newX) {
     x = newX
   }
@@ -23,12 +33,24 @@ var Player = function (startX, startY) {
     y = newY
   }
 
+  var grow = function(size) {
+    numSnakeSections = numSnakeSections + size
+  }
+
+  var setAngle = function(newAngle) {
+    angel = newAngle
+  }
+
   // Define which variables and methods can be accessed
   return {
     getX: getX,
     getY: getY,
+    getSections: getSections,
+    getAngle: getAngle,
     setX: setX,
     setY: setY,
+    setAngle: setAngle,
+    grow: grow,
     id: id
   }
 }

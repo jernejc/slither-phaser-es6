@@ -4,125 +4,112 @@ import Food from '../sprites/Food'
 import Player from '../objects/Player'
 import {setResponsiveWidth} from '../utils'
 import io from 'socket.io-client'
-let socket = io(`http://localhost:3000`)
 
 export default class extends Phaser.State {
   init () {
     this.foodGroup;
+    this.players;
   }
 
   preload () {
-    this.game.load.image('body','assets/images/body1.png');
-    this.game.load.image('head','assets/images/head1.png');
-    this.game.load.image('pink','assets/images/food/glowy-pink.png');
-    this.game.load.image('blue','assets/images/food/glowy-blue.png');
-    this.game.load.image('green','assets/images/food/glowy-green.png');
-    this.game.load.image('lime','assets/images/food/glowy-lime.png');
-    this.game.load.image('red','assets/images/food/glowy-red.png');
+    console.log('preload game')
   }
 
   create () {
     this.game.physics.startSystem(Phaser.Physics.ARCADE);
     this.game.world.setBounds(0, 0, 4600, 4600);
+    this.players = [];
 
-    this.enemies = [];
+    // Connect to socket
+    this.socket = io('http://' + window.location.hostname + ':8080');
+    
+    // Init me and make the camera follow me
     this.player = new Player({
+      index: ["me"],
       game: this.game,
       x: this.game.world.centerX,
       y: this.game.world.centerY,
+      numSnakeSections: 30,
+      socket: this.socket,
       assets: {
         head: 'head',
         body: 'body'
       }
     })
-
     this.game.camera.follow(this.player.snakeHead);
 
     // Add foodGroup and generate a few randoms ones
     this.foodGroup = this.game.add.physicsGroup();
-
-    for (let i = 0; i < 100; i++) {
-      this.foodGroup.create(this.game.world.randomX, this.game.world.randomY, 'pink');
-    }
-
-    for (let i = 0; i < 40; i++) {
-      this.foodGroup.create(this.game.world.randomX, this.game.world.randomY, 'blue');
-      this.foodGroup.create(this.game.world.randomX, this.game.world.randomY, 'green');
-    }
-
-    for (let i = 0; i < 10; i++) {
-      this.foodGroup.create(this.game.world.randomX, this.game.world.randomY, 'red');
-    }
-
-    for (let i = 0; i < 20; i++) {
-      this.foodGroup.create(this.game.world.randomX, this.game.world.randomY, 'lime');
-    }
 
     // set the sprite width to 30% of the game width
     //setResponsiveWidth(this.snakeHead, 30, this.game.world)
     //this.game.add.existing(this.player.snakeHead)
 
     // Socket connection successful
-    socket.on('connect', this._onSocketConnected)
+    this.socket.on('connect', this._onSocketConnected.bind(this))
 
     // Socket disconnection
-    //socket.on('disconnect', onSocketDisconnect)
+    this.socket.on('disconnect', this._onSocketDisconnect)
 
     // New player message received
-    //socket.on('new player', onNewPlayer)
+    this.socket.on('food group', this._onFoodGroup.bind(this))
 
-    // Player move message received
-    //socket.on('move player', onMovePlayer)
+    // New player message received
+    this.socket.on('new player', this._onNewPlayer.bind(this))
+
+    // Move player
+    this.socket.on('move player', this._onMovePlayer.bind(this))
+
+    // Grow player
+    this.socket.on('grow player', this._onGrowPlayer.bind(this))
+
+    // Rotate player
+    this.socket.on('rotate player', this._onRotatePlayer.bind(this))
 
     // Player removed message received
-    //socket.on('remove player', onRemovePlayer)
+    this.socket.on('remove player', this._onRemovePlayer.bind(this))
   }
 
   update () {
-    if (this.game.physics.arcade.collide(this.player.snakeHead, this.foodGroup, this._handleColision, this._processHandler, this)) {
+    if (this.game.physics.arcade.collide(this.player.snakeHead, this.foodGroup, this._handleFoodColision, this._processHandler, this)) {
       console.log('nom nom nom');
     }
 
     // Update player
-    this.player.update();
+    this.player.update(true);
+
+    // Update other players
+    for (var i = 0; i < this.players.length; i++) {
+      if (this.players[i].alive) {
+        this.players[i].update()
+        this.game.physics.arcade.collide(player, this.players[i].player, this._handlePlayerColision)
+      }
+    }
   }
 
   render () {
-    if (__DEV__) {
+    /*if (__DEV__) {
       this.game.debug.spriteInfo(this.player.snakeHead, 32, 32)
-    }
+    }*/
   }
 
   /******************** 
   ** Private helpers **
   ********************/
 
-  _handleColision (head, food) {
-    //console.log('_handleColision', arguments);
+  _handleFoodColision (head, food) {
+    console.log('_handleColision food', food);
 
-    switch(food.key) {
-      case 'green':
-        this.player.grow(1)
-      break;
-      case 'red':
-        this.player.grow(20)
-      break;
-      case 'blue':
-        this.player.grow(3)
-      break;
-      case 'lime':
-        this.player.grow(10)
-      break;
-      case 'pink':
-        this.player.grow(2)
-      break;
-    }
+    this.player.grow(food)
+    food.kill()
+  }
 
-    food.kill();
+  _handlePlayerColision (me, them) {
+    console.log('_handlePlayerColision', me, them)
   }
 
   _processHandler (head, food) { 
-    //console.log('_processHandler', arguments);
+    console.log('_processHandler', arguments);
 
     return true;
   }
@@ -132,15 +119,134 @@ export default class extends Phaser.State {
   *******************/
 
   _onSocketConnected () {
-    console.log('Connected to socket server')
+    console.log('_onSocketConnected Connected to socket server')
 
     // Reset enemies on reconnect
-    this.enemies.forEach(function (enemy) {
-      enemy.player.kill()
+    this.players.forEach(function(player) {
+      player.kill()
     })
-    this.enemies = []
+    this.players = [];
 
     // Send local player data to the game server
-    socket.emit('new player', { x: this.player.snakeHead.x, y: this.player.snakeHead.y })
+    this.socket.emit('new player', { x: this.player.snakeHead.x, y: this.player.snakeHead.y, numSnakeSections: this.numSnakeSections, angle: this.player.snakeHead.body.angularVelocity })
+  }
+
+  _onFoodGroup (data) {
+    var foodGroup = this.foodGroup;
+    var game = this.game;
+
+    data.forEach(function(foodItem) {
+      foodGroup.add(new Food({
+        game: game,
+        x: foodItem.id.x, 
+        y: foodItem.id.y, 
+        color: foodItem.id.color,
+        size: foodItem.id.size,
+        id: foodItem.id.id
+      }))
+    })
+
+    console.log('foodGroup', foodGroup);
+  }
+
+  _onNewPlayer (data) {
+    console.log('New player connected:', data)
+
+    // Avoid possible duplicate players
+    var duplicate = this.players.find(function(player){
+      return player.id == data.id;
+    })
+    if (duplicate) {
+      console.log('Duplicate player!')
+      return
+    }
+
+    // Add new player to the remote players array
+    this.players.push(new Player({
+      index: data.id,
+      game: this.game,
+      x: this.game.world.centerX,
+      y: this.game.world.centerY,
+      numSnakeSections: data.numSnakeSections,
+      socket: this.socket,
+      assets: {
+        head: 'headE',
+        body: 'bodyE'
+      }
+    }))
+  }
+
+  _onMovePlayer (data) {
+    //console.log('_onMovePlayer', data, this.players);
+    var player = this.players.find(function(player){
+      return player.id == data.id;
+    })
+
+    // Player not found
+    if (!player) {
+      console.log('Player not found: ', data.id)
+      return
+    }
+
+    // Update player position
+    player.movePlayer(data.x, data.y)
+  }
+
+  _onRotatePlayer (data) {
+    //console.log('_onRotatePlayer', data);
+    var player = this.players.find(function(player){
+      return player.id == data.id;
+    })
+
+    // Player not found
+    if (!player) {
+      console.log('Player not found: ', data.id)
+      return
+    }
+
+    // Update player position
+    player.rotateHead(data.angle)
+  }
+
+  _onGrowPlayer (data) {
+    console.log('_onGrowPlayer', data);
+    var player = this.players.find(function(player){
+      return player.id == data.id;
+    })
+
+    // Player not found
+    if (!player) {
+      console.log('Player not found: ', data.id)
+      return
+    }
+
+    // Update player position
+    player.grow(data.size, true)
+
+    // Remove food item
+    var food = this.foodGroup.children.find(function(foodItem) {
+      return foodItem.id == data.foodId;
+    })
+
+    if(food)
+      this.foodGroup.remove(food);
+  }
+
+  _onRemovePlayer (data) {
+    console.log('_onRemovePlayer', data);
+    var player = this.players.find(function(player){
+      return player.id == data.id;
+    })
+
+    // Player not found
+    if (!player) {
+      console.log('Player not found: ', data.id)
+      return
+    }
+
+    //player.player.kill()
+
+    // Remove player from array
+    this.players.splice(this.players.indexOf(player), 1)
   }
 }

@@ -1,6 +1,6 @@
-# Slither copy made with Phase
+# Slither copy made with Phaser
 
-#### While playing around with Phaser, I tried to do a slither.io copy
+While playing around with Phaser, I tried to do a slither.io copy
 
 ## 1. Clone this repo:
 

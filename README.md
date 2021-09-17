@@ -1,4 +1,4 @@
-# Slither copy made with Phaser
+# Slither copy made with Phaser.io
 
 While playing around with Phaser, I tried to do a slither.io copy
 
